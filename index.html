@@ -1,0 +1,899 @@
+CTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام مطابقة المخزون مع واد كنيس - Ouedkniss Sync</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- SheetJS (xlsx) for reading Excel & CSV files client-side -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Google Fonts: Cairo & Tajawal for modern Arabic UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#2563eb',
+                            600: '#1d4ed8',
+                            700: '#1e40af',
+                            900: '#0f172a',
+                        },
+                        ouedkniss: '#ff6600',
+                    },
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                        tajawal: ['Tajawal', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Cairo', 'Tajawal', sans-serif;
+            background-color: #f8fafc;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        @media print {
+            header, .no-print { display: none !important; }
+            main { padding: 0 !important; max-width: 100% !important; }
+            .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none !important; }
+            .border { border-color: #e2e8f0 !important; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Navbar Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Title -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-orange-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                        <i class="fa-solid fa-microchip text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg text-slate-900 leading-tight flex items-center gap-2">
+                            <span>نظام المطابقة والتدقيق الذكي</span>
+                            <span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-200">v2.0 Pro</span>
+                        </h1>
+                        <p class="text-xs text-slate-500 font-medium flex items-center gap-1">
+                            <span>إشراف وإدارة مخزون الحواسيب والقطع مع واد كنيس</span>
+                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                            <span class="text-orange-600 font-semibold">Ouedkniss Sync Engine</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Actions Header -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <button id="demoBtn" onclick="loadDemoData()" class="px-3 py-2 text-xs sm:text-sm font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition-all duration-200 flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-wand-magic-sparkles text-brand-600"></i>
+                        <span class="hidden sm:inline">تعبئة بيانات تجريبية موسعة</span>
+                        <span class="sm:hidden">بيانات تجريبية</span>
+                    </button>
+
+                    <button onclick="window.print()" class="px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all duration-200 flex items-center gap-1.5 border border-slate-300 shadow-sm">
+                        <i class="fa-solid fa-print"></i>
+                        <span class="hidden sm:inline">طباعة التقرير</span>
+                    </button>
+                    
+                    <button id="exportBtn" onclick="exportReport()" disabled class="px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-slate-400 cursor-not-allowed rounded-lg transition-all duration-200 flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>تصدير التقرير</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+        <!-- Top Controls & Settings Bar -->
+        <section class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm no-print">
+            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                
+                <!-- Matching Sensitivity & Criteria -->
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+                        <i class="fa-solid fa-sliders text-brand-600 text-sm"></i>
+                        <span class="text-xs font-bold text-slate-700">حساسية مطابقة الأسماء:</span>
+                        <input type="range" id="thresholdRange" min="70" max="100" value="85" onchange="updateThreshold(this.value)" class="w-24 accent-brand-600 cursor-pointer">
+                        <span id="thresholdVal" class="text-xs font-bold text-brand-700 bg-brand-100 px-2 py-0.5 rounded-md">85%</span>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer">
+                            <input type="checkbox" id="useFuzzyMatching" checked onchange="processAuditData()" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                            <span>تفعيل المطابقة الذكية بالاسم عند غياب الـ SKU</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer">
+                            <input type="checkbox" id="checkStockMode" checked onchange="processAuditData()" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                            <span>تنبيه النقص في المخزون (Out of Stock)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Session Reset / LocalStorage Status -->
+                <div class="flex items-center gap-2 justify-end">
+                    <span id="savedSessionBadge" class="hidden text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                        <i class="fa-solid fa-floppy-disk text-emerald-600"></i> تم حفظ الجلسة محلياً
+                    </span>
+                    <button onclick="resetSession()" class="text-xs text-rose-600 hover:text-rose-800 font-semibold px-2.5 py-1 rounded-lg hover:bg-rose-50 transition">
+                        <i class="fa-solid fa-trash-can"></i> إعادة ضبط
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Step 1: File Upload & Column Mapping -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-4 no-print">
+            
+            <!-- CRM File Box -->
+            <div class="bg-white border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-2xl p-5 transition-all duration-200 shadow-sm relative group bg-gradient-to-b from-white to-slate-50/50">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-100 text-brand-600 flex items-center justify-center font-bold">
+                            <i class="fa-solid fa-database text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm">1. ملف مخزون الـ CRM</h3>
+                            <p class="text-xs text-slate-500">قائمة مخزون المحل والقطع المتوفرة</p>
+                        </div>
+                    </div>
+                    <span id="crmStatusBadge" class="hidden text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        <i class="fa-solid fa-check text-xs"></i> تم التحميل
+                    </span>
+                </div>
+
+                <div class="mt-2 flex flex-col items-center justify-center border border-slate-200 rounded-xl p-4 bg-white hover:bg-slate-50 transition cursor-pointer relative" onclick="document.getElementById('crmFileInput').click()">
+                    <input type="file" id="crmFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event, 'crm')">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2 group-hover:scale-110 group-hover:text-brand-500 transition-all duration-200"></i>
+                    <p class="text-xs font-semibold text-slate-700 mb-1" id="crmFileName">اختر ملف أو اسحبه إلى هنا</p>
+                    <p class="text-[11px] text-slate-400">يدعم الأعمدة: SKU/Ref, Nom, Prix, Stock/Quantité</p>
+                </div>
+            </div>
+
+            <!-- Ouedkniss File Box -->
+            <div class="bg-white border-2 border-dashed border-slate-300 hover:border-orange-500 rounded-2xl p-5 transition-all duration-200 shadow-sm relative group bg-gradient-to-b from-white to-slate-50/50">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
+                            <i class="fa-solid fa-store text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm">2. ملف إعلانات واد كنيس</h3>
+                            <p class="text-xs text-slate-500">قائمة المنتجات المنشورة أونلاين</p>
+                        </div>
+                    </div>
+                    <span id="storeStatusBadge" class="hidden text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        <i class="fa-solid fa-check text-xs"></i> تم التحميل
+                    </span>
+                </div>
+
+                <div class="mt-2 flex flex-col items-center justify-center border border-slate-200 rounded-xl p-4 bg-white hover:bg-slate-50 transition cursor-pointer relative" onclick="document.getElementById('storeFileInput').click()">
+                    <input type="file" id="storeFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event, 'store')">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2 group-hover:scale-110 group-hover:text-orange-500 transition-all duration-200"></i>
+                    <p class="text-xs font-semibold text-slate-700 mb-1" id="storeFileName">اختر ملف أو اسحبه إلى هنا</p>
+                    <p class="text-[11px] text-slate-400">يدعم الأعمدة: SKU/Ref, Nom, Prix, Statut</p>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- KPI Dashboard Cards & Financial Impact Section -->
+        <section id="kpiSection" class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+            
+            <!-- Total CRM Products -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-500 mb-2">
+                    <span class="text-xs font-bold text-slate-600">إجمالي الـ CRM</span>
+                    <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                </div>
+                <div>
+                    <span id="kpiTotalCrm" class="text-2xl font-extrabold text-slate-900">0</span>
+                    <span class="text-xs text-slate-500 mr-1">منتج</span>
+                </div>
+            </div>
+
+            <!-- Unposted Products -->
+            <div class="bg-white p-4 rounded-2xl border border-rose-200 shadow-sm flex flex-col justify-between bg-rose-50/20">
+                <div class="flex items-center justify-between text-rose-600 mb-2">
+                    <span class="text-xs font-bold text-rose-800">غير منشورة أونلاين</span>
+                    <div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-eye-slash"></i>
+                    </div>
+                </div>
+                <div>
+                    <span id="kpiUnposted" class="text-2xl font-extrabold text-rose-600">0</span>
+                    <span class="text-xs text-rose-500 mr-1">منتج غائب</span>
+                </div>
+            </div>
+
+            <!-- Price Mismatches -->
+            <div class="bg-white p-4 rounded-2xl border border-amber-200 shadow-sm flex flex-col justify-between bg-amber-50/20">
+                <div class="flex items-center justify-between text-amber-600 mb-2">
+                    <span class="text-xs font-bold text-amber-800">اختلاف الأسعار</span>
+                    <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                </div>
+                <div>
+                    <span id="kpiMismatch" class="text-2xl font-extrabold text-amber-600">0</span>
+                    <span class="text-xs text-amber-500 mr-1">خطأ بالسعر</span>
+                </div>
+            </div>
+
+            <!-- Stock Alert -->
+            <div class="bg-white p-4 rounded-2xl border border-purple-200 shadow-sm flex flex-col justify-between bg-purple-50/20">
+                <div class="flex items-center justify-between text-purple-600 mb-2">
+                    <span class="text-xs font-bold text-purple-800">نافذة من المخزن</span>
+                    <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-cubes-stacked"></i>
+                    </div>
+                </div>
+                <div>
+                    <span id="kpiStockAlert" class="text-2xl font-extrabold text-purple-600">0</span>
+                    <span class="text-xs text-purple-500 mr-1">نفد كميتها</span>
+                </div>
+            </div>
+
+            <!-- Total Financial Risk Loss -->
+            <div class="bg-gradient-to-br from-rose-900 to-red-950 p-4 rounded-2xl text-white shadow-md flex flex-col justify-between col-span-2 lg:col-span-1">
+                <div class="flex items-center justify-between text-rose-200 mb-2">
+                    <span class="text-xs font-bold">تقدير فروق الأسعار</span>
+                    <div class="w-7 h-7 rounded-lg bg-white/10 text-rose-300 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-coins"></i>
+                    </div>
+                </div>
+                <div>
+                    <span id="kpiFinancialRisk" class="text-xl font-extrabold text-rose-300">0 د.ج</span>
+                    <p class="text-[10px] text-rose-200/80 mt-1">إجمالي الفارق في المنتجات المسعرة بأقل</p>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Main Data Table Container -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1">
+            
+            <!-- Table Header Toolbar -->
+            <div class="p-4 border-b border-slate-200 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-slate-50/50 no-print">
+                
+                <!-- Status Filter Tabs -->
+                <div class="flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-bold overflow-x-auto max-w-full custom-scrollbar">
+                    <button onclick="setFilter('ALL')" id="filterTabALL" class="px-3 py-1.5 rounded-lg bg-white text-slate-800 shadow-sm transition">
+                        الكل (<span id="countAll">0</span>)
+                    </button>
+                    <button onclick="setFilter('UNPOSTED')" id="filterTabUNPOSTED" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                        غير منشور (<span id="countUnposted">0</span>)
+                    </button>
+                    <button onclick="setFilter('MISMATCH')" id="filterTabMISMATCH" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                        اختلاف السعر (<span id="countMismatch">0</span>)
+                    </button>
+                    <button onclick="setFilter('STOCK_OUT')" id="filterTabSTOCK_OUT" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        نفد المخزون (<span id="countStockOut">0</span>)
+                    </button>
+                    <button onclick="setFilter('OK')" id="filterTabOK" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        مطابق (<span id="countOk">0</span>)
+                    </button>
+                    <button onclick="setFilter('RESOLVED')" id="filterTabRESOLVED" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        تم المعالجة (<span id="countResolved">0</span>)
+                    </button>
+                </div>
+
+                <!-- Search & Brand Filters -->
+                <div class="flex items-center gap-2">
+                    <!-- Brand Filter Dropdown -->
+                    <select id="brandFilterSelect" onchange="applyFilters()" class="text-xs bg-white border border-slate-300 rounded-xl px-2.5 py-2 focus:outline-none focus:border-brand-500">
+                        <option value="ALL">كل الماركات / العلامات</option>
+                    </select>
+
+                    <!-- Search Bar Input -->
+                    <div class="relative flex-1 min-w-[200px]">
+                        <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="applyFilters()" placeholder="البحث بالرمز، الاسم، الموديل..." class="w-full pl-4 pr-9 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition">
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Table View -->
+            <div class="overflow-x-auto custom-scrollbar flex-1">
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider sticky top-0 z-10">
+                        <tr>
+                            <th class="py-3.5 px-4">رمز المنتج (SKU)</th>
+                            <th class="py-3.5 px-4">اسم وقطعة الحاسوب</th>
+                            <th class="py-3.5 px-4">مخزون CRM</th>
+                            <th class="py-3.5 px-4">سعر الـ CRM</th>
+                            <th class="py-3.5 px-4">سعر واد كنيس</th>
+                            <th class="py-3.5 px-4">الفارق والفرق</th>
+                            <th class="py-3.5 px-4">حالة المطابقة</th>
+                            <th class="py-3.5 px-4 text-center no-print">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditTableBody" class="divide-y divide-slate-200 font-medium">
+                        <!-- Default Empty State -->
+                        <tr>
+                            <td colspan="8" class="py-16 text-center text-slate-400">
+                                <div class="flex flex-col items-center justify-center gap-3">
+                                    <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 text-2xl">
+                                        <i class="fa-solid fa-sliders"></i>
+                                    </div>
+                                    <p class="font-bold text-slate-600 text-sm">جاهز لفحص وتدقيق قائمة المنتجات والإعلانات</p>
+                                    <p class="text-xs text-slate-400">يرجى رفع ملفات الإكسل الخاصة بك أو التجربة بالبيانات التوضيحية</p>
+                                    <button onclick="loadDemoData()" class="mt-2 px-4 py-2 bg-brand-600 text-white font-bold rounded-xl text-xs hover:bg-brand-700 transition shadow-md shadow-brand-500/20">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> تعبئة بيانات تجريبية موسعة
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Footer Status Summary -->
+            <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                <span id="tableSummaryText">إجمالي السجلات: 0</span>
+                <span class="flex items-center gap-1 text-[11px] text-slate-400">
+                    <i class="fa-solid fa-shield-cat"></i> خوارزمية Levenshtein مطبقة لحساب دقة أسماء الحواسيب والقطع
+                </span>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Modal: Mapping Custom Columns -->
+    <div id="mappingModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4 animate-fade-in">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-brand-600"></i>
+                    <span>ربط أعمدة الملف المرفوع</span>
+                </h3>
+                <button onclick="closeMappingModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-500">تعرفنا على أعمدة ملفك، يمكنك ضبط الربط اليدوي في حال اختلف مسمى الأعمدة:</p>
+            
+            <div class="space-y-3 text-xs" id="mappingFieldsContainer">
+                <!-- Dynamic select inputs will be generated here -->
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button onclick="closeMappingModal()" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200">إلغاء</button>
+                <button onclick="confirmCustomMapping()" class="px-4 py-2 bg-brand-600 text-white font-bold rounded-xl text-xs hover:bg-brand-700 shadow-md">تأكيد المزامنة</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App JavaScript Logic -->
+    <script>
+        // Application State
+        let rawCrmData = [];
+        let rawStoreData = [];
+        let auditResults = [];
+        let resolvedSkus = new Set();
+        let currentFilter = 'ALL';
+        let matchThreshold = 85;
+
+        // Extended Computer & Electronics Hardware Demo Data
+        const demoCrmList = [
+            { SKU: "GPU-RTX4060-8G", Title: "Carte Graphique Nvidia RTX 4060 8GB Ventus", Price: 68000, Stock: 5, Brand: "MSI" },
+            { SKU: "CPU-I5-13400F", Title: "Processeur Intel Core i5-13400F Box", Price: 34500, Stock: 12, Brand: "Intel" },
+            { SKU: "RAM-DDR4-16GB-COR", Title: "Mémoire RAM Corsair Vengeance 16GB (2x8GB) 3200MHz", Price: 9800, Stock: 20, Brand: "Corsair" },
+            { SKU: "SSD-1TB-NVME-KING", Title: "Disque SSD Kingston NV2 1TB NVMe M.2", Price: 11200, Stock: 0, Brand: "Kingston" }, // Out of stock
+            { SKU: "LAP-ASUS-TUF-F15", Title: "PC Portable Gamer Asus TUF F15 i7 12th RTX 3050", Price: 142000, Stock: 3, Brand: "Asus" },
+            { SKU: "MON-MSI-24-180HZ", Title: "Ecran MSI 24 IPS 180Hz G244F E2", Price: 29500, Stock: 8, Brand: "MSI" },
+            { SKU: "PSU-750W-BRONZE", Title: "Boite Alimentation MSI MAG A750BN 750W 80+", Price: 13800, Stock: 10, Brand: "MSI" },
+            { SKU: "KEY-REDRAGON-K552", Title: "Clavier Mécanique Redragon K552 RGB Sw Red", Price: 6200, Stock: 15, Brand: "Redragon" },
+            { SKU: "MB-ASUS-B760M-K", Title: "Carte Mère ASUS Prime B760M-K DDR4", Price: 24000, Stock: 4, Brand: "Asus" },
+            { SKU: "LAP-LENOVO-LOQ15", Title: "PC Portable Lenovo LOQ 15 i5 13th RTX 4050", Price: 165000, Stock: 2, Brand: "Lenovo" }
+        ];
+
+        const demoStoreList = [
+            { SKU: "GPU-RTX4060-8G", Title: "Carte Graphique Nvidia RTX 4060 8GB Ventus", Price: 72000 }, // Mismatch higher
+            { SKU: "CPU-I5-13400F", Title: "Processeur Intel Core i5-13400F Box", Price: 34500 }, // Match
+            { SKU: "RAM-DDR4-16GB-COR", Title: "Mémoire RAM Corsair Vengeance 16GB 3200MHz", Price: 9800 }, // Match
+            { SKU: "SSD-1TB-NVME-KING", Title: "Disque SSD Kingston NV2 1TB NVMe M.2", Price: 11200 }, // Out of stock alert
+            { SKU: "LAP-ASUS-TUF-F15", Title: "PC Portable Gamer Asus TUF F15 i7 12th RTX 3050", Price: 136000 }, // Mismatch lower (Risk loss 6000 DA)
+            { SKU: "MON-MSI-24-180HZ", Title: "Ecran MSI 24 IPS 180Hz G244F E2", Price: 29500 }, // Match
+            { SKU: "", Title: "Carte Mère ASUS Prime B760M K DDR4 Gaming", Price: 24000 } // Fuzzy match by title without SKU!
+        ];
+
+        // Init App & Load LocalStorage
+        window.onload = function() {
+            loadSavedSession();
+        };
+
+        function updateThreshold(val) {
+            matchThreshold = parseInt(val);
+            document.getElementById('thresholdVal').innerText = `${val}%`;
+            if (rawCrmData.length > 0) processAuditData();
+        }
+
+        // Levenshtein String Similarity Algorithm for Fuzzy Title Matching
+        function calculateSimilarity(str1, str2) {
+            const s1 = String(str1).toLowerCase().replace(/[^a-z0-9]/g, '');
+            const s2 = String(str2).toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (s1 === s2) return 100;
+            if (!s1 || !s2) return 0;
+
+            const track = Array(s2.length + 1).fill(null).map(() => Array(s1.length + 1).fill(null));
+            for (let i = 0; i <= s1.length; i += 1) track[0][i] = i;
+            for (let j = 0; j <= s2.length; j += 1) track[j][0] = j;
+
+            for (let j = 1; j <= s2.length; j += 1) {
+                for (let i = 1; i <= s1.length; i += 1) {
+                    const indicator = s1[i - 1] === s2[j - 1] ? 0 : 1;
+                    track[j][i] = Math.min(
+                        track[j][i - 1] + 1,
+                        track[j - 1][i] + 1,
+                        track[j - 1][i - 1] + indicator
+                    );
+                }
+            }
+            const distance = track[s2.length][s1.length];
+            const maxLen = Math.max(s1.length, s2.length);
+            return Math.round(((maxLen - distance) / maxLen) * 100);
+        }
+
+        // Load Demo Data
+        function loadDemoData() {
+            rawCrmData = JSON.parse(JSON.stringify(demoCrmList));
+            rawStoreData = JSON.parse(JSON.stringify(demoStoreList));
+
+            document.getElementById('crmStatusBadge').classList.remove('hidden');
+            document.getElementById('storeStatusBadge').classList.remove('hidden');
+            document.getElementById('crmFileName').innerText = "بيانات مخزون الحواسيب (10 منتجات)";
+            document.getElementById('storeFileName').innerText = "بيانات واد كنيس (7 إعلانات)";
+
+            populateBrandFilter();
+            processAuditData();
+        }
+
+        // Handle Upload & Smart Parsing
+        function handleFileUpload(event, type) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+                    if (type === 'crm') {
+                        rawCrmData = parseDataFlexibly(jsonData, 'crm');
+                        document.getElementById('crmStatusBadge').classList.remove('hidden');
+                        document.getElementById('crmFileName').innerText = file.name;
+                    } else {
+                        rawStoreData = parseDataFlexibly(jsonData, 'store');
+                        document.getElementById('storeStatusBadge').classList.remove('hidden');
+                        document.getElementById('storeFileName').innerText = file.name;
+                    }
+
+                    populateBrandFilter();
+                    if (rawCrmData.length > 0) processAuditData();
+                } catch (err) {
+                    alert("تعذر قراءة الملف. يرجى التثبت من صيغة الملف (Excel أو CSV).");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Parse JSON dynamically across language columns (Ar, Fr, En)
+        function parseDataFlexibly(data, type) {
+            return data.map(item => {
+                const keys = Object.keys(item);
+                
+                const skuKey = keys.find(k => /sku|ref|code|رمز/i.test(k)) || keys[0];
+                const titleKey = keys.find(k => /title|name|nom|اسم|منتج|désignation/i.test(k)) || keys[1];
+                const priceKey = keys.find(k => /price|prix|سعر|tarif/i.test(k)) || keys[2];
+                const stockKey = keys.find(k => /stock|qty|quantité|كمية/i.test(k));
+                const brandKey = keys.find(k => /brand|marque|شركة|ماركة/i.test(k));
+
+                const skuVal = String(item[skuKey] || '').trim();
+                const titleVal = String(item[titleKey] || 'بدون اسم').trim();
+                const priceVal = parseFloat(String(item[priceKey] || 0).replace(/[^0-9.]/g, '')) || 0;
+                const stockVal = stockKey ? parseInt(item[stockKey]) || 0 : 5;
+
+                // Extract brand from title if missing
+                let brandVal = brandKey ? String(item[brandKey]) : '';
+                if (!brandVal) {
+                    const brands = ["Asus", "MSI", "Intel", "AMD", "Corsair", "Kingston", "Lenovo", "Redragon", "Dell", "HP"];
+                    const found = brands.find(b => titleVal.toLowerCase().includes(b.toLowerCase()));
+                    brandVal = found || "عام / متنوع";
+                }
+
+                return {
+                    SKU: skuVal,
+                    Title: titleVal,
+                    Price: priceVal,
+                    Stock: stockVal,
+                    Brand: brandVal
+                };
+            });
+        }
+
+        // Core Audit & Multi-Criteria Engine
+        function processAuditData() {
+            const useFuzzy = document.getElementById('useFuzzyMatching').checked;
+            const checkStock = document.getElementById('checkStockMode').checked;
+
+            let totalLossRisk = 0;
+
+            auditResults = rawCrmData.map(crm => {
+                let match = null;
+                let matchType = 'EXACT_SKU';
+                let similarity = 100;
+
+                // 1. Primary Match: Exact SKU
+                if (crm.SKU) {
+                    match = rawStoreData.find(s => s.SKU && s.SKU.toUpperCase() === crm.SKU.toUpperCase());
+                }
+
+                // 2. Secondary Match: Fuzzy Title Search if enabled and SKU not found
+                if (!match && useFuzzy && crm.Title) {
+                    let bestMatch = null;
+                    let highestScore = 0;
+
+                    rawStoreData.forEach(store => {
+                        const score = calculateSimilarity(crm.Title, store.Title);
+                        if (score >= matchThreshold && score > highestScore) {
+                            highestScore = score;
+                            bestMatch = store;
+                        }
+                    });
+
+                    if (bestMatch) {
+                        match = bestMatch;
+                        matchType = 'FUZZY_TITLE';
+                        similarity = highestScore;
+                    }
+                }
+
+                // Is item marked as resolved manually?
+                const isResolved = resolvedSkus.has(crm.SKU || crm.Title);
+
+                // Unposted Status
+                if (!match) {
+                    return {
+                        ...crm,
+                        StorePrice: null,
+                        Diff: null,
+                        Status: isResolved ? 'RESOLVED' : 'UNPOSTED',
+                        StatusLabel: isResolved ? 'تم المعالجة' : 'غير منشور على واد كنيس',
+                        MatchInfo: 'غائب عن المتجر',
+                        Note: 'المنتج متوفر بمخزونك ولم يُنشر بعد على المنصة'
+                    };
+                }
+
+                // Out of stock alert when posted online
+                if (checkStock && crm.Stock === 0) {
+                    return {
+                        ...crm,
+                        StorePrice: match.Price,
+                        Diff: crm.Price - match.Price,
+                        Status: isResolved ? 'RESOLVED' : 'STOCK_OUT',
+                        StatusLabel: isResolved ? 'تم المعالجة' : 'منشور وكميته 0 بالمخزن',
+                        MatchInfo: matchType === 'FUZZY_TITLE' ? `تطابق اسم (${similarity}%)` : 'مطابق بالرمز',
+                        Note: 'تنبيه: الإعلان منشور أونلاين ولكن المخزن يشير إلى 0 قطعة'
+                    };
+                }
+
+                // Price Discrepancy Check
+                const priceDiff = crm.Price - match.Price;
+
+                if (Math.abs(priceDiff) > 0.01) {
+                    if (priceDiff > 0) totalLossRisk += priceDiff; // Store price is lower than CRM price
+
+                    return {
+                        ...crm,
+                        StorePrice: match.Price,
+                        Diff: priceDiff,
+                        Status: isResolved ? 'RESOLVED' : 'MISMATCH',
+                        StatusLabel: isResolved ? 'تم المعالجة' : 'تباين في السعر',
+                        MatchInfo: matchType === 'FUZZY_TITLE' ? `تطابق اسم (${similarity}%)` : 'مطابق بالرمز',
+                        Note: priceDiff > 0 
+                            ? `سعر واد كنيس أقل بـ ${Math.abs(priceDiff).toLocaleString()} د.ج`
+                            : `سعر واد كنيس أعلى بـ ${Math.abs(priceDiff).toLocaleString()} د.ج`
+                    };
+                }
+
+                // Perfect Match
+                return {
+                    ...crm,
+                    StorePrice: match.Price,
+                    Diff: 0,
+                    Status: isResolved ? 'RESOLVED' : 'OK',
+                    StatusLabel: isResolved ? 'تم المعالجة' : 'مطابق وسليم',
+                    MatchInfo: matchType === 'FUZZY_TITLE' ? `تطابق اسم (${similarity}%)` : 'مطابق بالرمز',
+                    Note: 'البيانات والسعر متطابقين تماماً'
+                };
+            });
+
+            // Save state & Update UI
+            saveSessionLocally(totalLossRisk);
+            updateKpis(totalLossRisk);
+            applyFilters();
+
+            // Enable Export
+            const exportBtn = document.getElementById('exportBtn');
+            exportBtn.disabled = false;
+            exportBtn.className = "px-3 py-2 text-xs sm:text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all duration-200 flex items-center gap-1.5 shadow-md cursor-pointer";
+        }
+
+        // Update Dashboard Indicators
+        function updateKpis(totalLossRisk) {
+            const total = auditResults.length;
+            const unposted = auditResults.filter(r => r.Status === 'UNPOSTED').length;
+            const mismatch = auditResults.filter(r => r.Status === 'MISMATCH').length;
+            const stockOut = auditResults.filter(r => r.Status === 'STOCK_OUT').length;
+            const ok = auditResults.filter(r => r.Status === 'OK').length;
+            const resolved = auditResults.filter(r => r.Status === 'RESOLVED').length;
+
+            document.getElementById('kpiTotalCrm').innerText = total.toLocaleString();
+            document.getElementById('kpiUnposted').innerText = unposted.toLocaleString();
+            document.getElementById('kpiMismatch').innerText = mismatch.toLocaleString();
+            document.getElementById('kpiStockAlert').innerText = stockOut.toLocaleString();
+            document.getElementById('kpiFinancialRisk').innerText = `${totalLossRisk.toLocaleString()} د.ج`;
+
+            document.getElementById('countAll').innerText = total;
+            document.getElementById('countUnposted').innerText = unposted;
+            document.getElementById('countMismatch').innerText = mismatch;
+            document.getElementById('countStockOut').innerText = stockOut;
+            document.getElementById('countOk').innerText = ok;
+            document.getElementById('countResolved').innerText = resolved;
+        }
+
+        // Populate Brand Dropdown Options
+        function populateBrandFilter() {
+            const select = document.getElementById('brandFilterSelect');
+            const brands = Array.from(new Set(rawCrmData.map(i => i.Brand).filter(Boolean)));
+            
+            select.innerHTML = `<option value="ALL">كل الماركات (${brands.length})</option>`;
+            brands.forEach(b => {
+                select.innerHTML += `<option value="${b}">${b}</option>`;
+            });
+        }
+
+        // Change Status Filter Tab
+        function setFilter(type) {
+            currentFilter = type;
+            ['ALL', 'UNPOSTED', 'MISMATCH', 'STOCK_OUT', 'OK', 'RESOLVED'].forEach(t => {
+                const btn = document.getElementById(`filterTab${t}`);
+                if (btn) {
+                    if (t === type) {
+                        btn.className = "px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition font-bold";
+                    } else {
+                        btn.className = "px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition flex items-center gap-1";
+                    }
+                }
+            });
+            applyFilters();
+        }
+
+        // Apply Search & Filters
+        function applyFilters() {
+            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+            const brandVal = document.getElementById('brandFilterSelect').value;
+
+            const filtered = auditResults.filter(item => {
+                const matchStatus = (currentFilter === 'ALL') || (item.Status === currentFilter);
+                const matchBrand = (brandVal === 'ALL') || (item.Brand === brandVal);
+                const matchSearch = (item.SKU && item.SKU.toLowerCase().includes(searchVal)) || 
+                                    (item.Title && item.Title.toLowerCase().includes(searchVal));
+                
+                return matchStatus && matchBrand && matchSearch;
+            });
+
+            renderTable(filtered);
+        }
+
+        // Render Table Rows
+        function renderTable(data) {
+            const tbody = document.getElementById('auditTableBody');
+
+            if (data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="py-12 text-center text-slate-400">
+                            <i class="fa-solid fa-filter text-2xl mb-2 text-slate-300"></i>
+                            <p class="font-bold text-slate-600 text-xs">لا توجد بيانات تنطبق مع التصفية الحالية</p>
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('tableSummaryText').innerText = `إجمالي المعروض: 0`;
+                return;
+            }
+
+            tbody.innerHTML = data.map(row => {
+                let badgeClass = "";
+                let diffText = "-";
+                let storePriceText = row.StorePrice ? `${row.StorePrice.toLocaleString()} د.ج` : '<span class="text-slate-400">غائب</span>';
+
+                if (row.Status === 'UNPOSTED') {
+                    badgeClass = "bg-rose-100 text-rose-700 border-rose-200";
+                } else if (row.Status === 'MISMATCH') {
+                    badgeClass = "bg-amber-100 text-amber-800 border-amber-200";
+                    const formattedDiff = Math.abs(row.Diff).toLocaleString();
+                    diffText = row.Diff > 0 
+                        ? `<span class="text-rose-600 font-bold">-${formattedDiff} د.ج</span>` 
+                        : `<span class="text-emerald-600 font-bold">+${formattedDiff} د.ج</span>`;
+                } else if (row.Status === 'STOCK_OUT') {
+                    badgeClass = "bg-purple-100 text-purple-700 border-purple-200";
+                } else if (row.Status === 'RESOLVED') {
+                    badgeClass = "bg-blue-100 text-blue-700 border-blue-200";
+                } else {
+                    badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200";
+                    diffText = `<span class="text-slate-400">0 د.ج</span>`;
+                }
+
+                const uniqueKey = row.SKU || row.Title;
+                const isResolved = resolvedSkus.has(uniqueKey);
+
+                return `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100 animate-fade-in ${isResolved ? 'bg-slate-50/70 opacity-75' : ''}">
+                        <td class="py-3 px-4 font-mono font-bold text-slate-900">
+                            ${row.SKU ? row.SKU : '<span class="text-amber-600 text-[10px] bg-amber-50 px-1 rounded">بدون رمز</span>'}
+                        </td>
+                        <td class="py-3 px-4 font-medium text-slate-800 max-w-xs">
+                            <div class="truncate font-bold text-slate-900" title="${row.Title}">${row.Title}</div>
+                            <div class="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                                <span>الماركة: ${row.Brand}</span>
+                                <span class="text-slate-300">•</span>
+                                <span class="text-brand-600">${row.MatchInfo}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-0.5 rounded text-[11px] font-bold ${row.Stock === 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}">
+                                ${row.Stock} قطعة
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 font-semibold text-slate-900">${row.Price.toLocaleString()} د.ج</td>
+                        <td class="py-3 px-4 font-semibold">${storePriceText}</td>
+                        <td class="py-3 px-4">${diffText}</td>
+                        <td class="py-3 px-4">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeClass}">
+                                ${row.StatusLabel}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-center no-print">
+                            <button onclick="toggleResolved('${escape(uniqueKey)}')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg border transition ${isResolved ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-brand-50 text-brand-700 border-brand-200 hover:bg-brand-100'}">
+                                ${isResolved ? 'إلغاء المعالجة' : 'تم الحل'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('tableSummaryText').innerText = `إجمالي المعروض: ${data.length} من إجمالي ${auditResults.length}`;
+        }
+
+        // Toggle Resolved / Handled Status
+        function toggleResolved(escapedKey) {
+            const key = unescape(escapedKey);
+            if (resolvedSkus.has(key)) {
+                resolvedSkus.delete(key);
+            } else {
+                resolvedSkus.add(key);
+            }
+            processAuditData();
+        }
+
+        // Save & Restore LocalStorage Session
+        function saveSessionLocally(lossVal) {
+            if (rawCrmData.length === 0) return;
+            const sessionObj = {
+                rawCrmData,
+                rawStoreData,
+                resolvedSkus: Array.from(resolvedSkus),
+                matchThreshold
+            };
+            localStorage.setItem('ouedkniss_sync_session', JSON.stringify(sessionObj));
+            document.getElementById('savedSessionBadge').classList.remove('hidden');
+        }
+
+        function loadSavedSession() {
+            const saved = localStorage.getItem('ouedkniss_sync_session');
+            if (!saved) return;
+            try {
+                const data = JSON.parse(saved);
+                rawCrmData = data.rawCrmData || [];
+                rawStoreData = data.rawStoreData || [];
+                resolvedSkus = new Set(data.resolvedSkus || []);
+                matchThreshold = data.matchThreshold || 85;
+
+                if (rawCrmData.length > 0) {
+                    document.getElementById('crmStatusBadge').classList.remove('hidden');
+                    document.getElementById('crmFileName').innerText = "تم استرجاع الجلسة السابقة";
+                    populateBrandFilter();
+                    processAuditData();
+                }
+            } catch (e) {
+                console.error("Session restore failed", e);
+            }
+        }
+
+        function resetSession() {
+            if (confirm("هل أنت تأكد من إغلاق الجلسة ومسح البيانات المحفوظة محلياً؟")) {
+                localStorage.removeItem('ouedkniss_sync_session');
+                location.reload();
+            }
+        }
+
+        // Export Report to Excel File
+        function exportReport() {
+            if (auditResults.length === 0) return;
+
+            const exportData = auditResults.map(r => ({
+                "رمز المنتج (SKU)": r.SKU || "غير محدد",
+                "اسم وقطعة الحاسوب": r.Title,
+                "الماركة": r.Brand,
+                "مخزون CRM": r.Stock,
+                "سعر الـ CRM (د.ج)": r.Price,
+                "سعر واد كنيس (د.ج)": r.StorePrice || "غير منشور",
+                "الفارق (د.ج)": r.Diff || 0,
+                "حالة التقرير": r.StatusLabel,
+                "طريقة المطابقة": r.MatchInfo,
+                "الملاحظات": r.Note
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "تقرير المطابقة والتدقيق");
+
+            XLSX.writeFile(workbook, `Ouedkniss_Audit_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+    </script>
+</body>
+</html>
